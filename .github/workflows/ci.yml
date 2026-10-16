@@ -1,0 +1,103 @@
+
+name: Build & test
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  assets-check:
+    name: Asset and source validation
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Check required project files
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          root = Path(".")
+          required = [
+              "README.md",
+              "mac/build.command",
+              "mac/Sources/main.swift",
+              "windows/main.py",
+              "windows/pet_state.py",
+              "windows/requirements.txt",
+              "windows/start_windows.bat",
+              "windows/build_windows.bat",
+              "assets/laugh_original_audio.m4a",
+          ]
+
+          for i in range(1, 6):
+              required.append(f"assets/Stills/pose_{i}.png")
+
+          for i in range(9):
+              required.append(f"assets/Stills/belly_{i:02d}.png")
+
+          for i in range(443):
+              required.append(f"assets/LaughFrames/frame_{i:03d}.png")
+
+          missing = [path for path in required if not (root / path).is_file()]
+
+          if missing:
+              for path in missing:
+                  print(f"MISSING: {path}")
+              raise SystemExit(1)
+
+          print(f"PASS: {len(required)} required files found")
+          PY
+
+      - name: Behavioral unit tests
+        run: python -m unittest discover -s tests -v
+
+      - name: Check Windows Python syntax
+        run: |
+          python -m py_compile windows/main.py windows/pet_state.py
+
+  macos-build:
+    name: macOS app compilation
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Compile unsigned macOS app
+        run: NAIWA_SKIP_OPEN=1 bash mac/build.command
+
+  windows-build:
+    name: Windows exe compilation
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Behavioral unit tests
+        run: python -m unittest discover -s tests -v
+
+      - name: Check Python syntax
+        run: python -m py_compile windows/main.py windows/pet_state.py
+
+      - name: Build onedir EXE
+        working-directory: windows
+        run: cmd /c build_windows.bat
+        env:
+          CI: '1'
+
+      - name: Confirm compiled executable
+        shell: pwsh
+        run: |
+          if (-not (Test-Path 'windows/dist/NaiwaPetWindows/NaiwaPetWindows.exe')) {
+            Write-Error "Windows executable was not generated"
+            exit 1
+          }
+          Write-Host "Windows EXE build successful"

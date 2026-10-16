@@ -1,0 +1,17 @@
+# macOS built app
+mac/*.app/
+mac/.Naiwa.iconset/
+.DS_Store
+*.swp
+# Windows virtualenv, build output
+windows/.venv/
+windows/build/
+windows/dist/
+windows/*.spec
+# Python caches
+__pycache__/
+*.py[cod]
+.pytest_cache/
+# Development-only
+.vscode/
+.idea/
